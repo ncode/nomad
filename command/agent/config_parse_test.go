@@ -5,6 +5,7 @@ package agent
 
 import (
 	"fmt"
+	client "github.com/hashicorp/nomad/client/config"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -96,6 +97,39 @@ var basicConfig = &Config{
 		BridgeNetworkName:       "custom_bridge_name",
 		BridgeNetworkSubnet:     "custom_bridge_subnet",
 		BridgeNetworkSubnetIPv6: "custom_bridge_subnet_ipv6",
+		TemplateConfig: &client.ClientTemplateConfig{
+			FunctionDenylist:      []string{"plugin", "writeToFile"},
+			DisableSandbox:        false,
+			MaxStaleHCL:           "87600h",
+			BlockQueryWaitTimeHCL: "5m",
+			Wait: &client.WaitConfig{
+				MinHCL: "5m",
+				MaxHCL: "10m",
+			},
+			WaitBounds: &client.WaitConfig{
+				MinHCL: "5m",
+				MaxHCL: "10m",
+			},
+			ConsulRetry: &client.RetryConfig{
+				Attempts:      pointer.Of(3),
+				BackoffHCL:    "1s",
+				MaxBackoffHCL: "10s",
+			},
+			VaultRetry: &client.RetryConfig{
+				Attempts:      pointer.Of(3),
+				Backoff:       pointer.Of(1 * time.Second),
+				BackoffHCL:    "1s",
+				MaxBackoff:    pointer.Of(10 * time.Second),
+				MaxBackoffHCL: "10s",
+			},
+			NomadRetry: &client.RetryConfig{
+				Attempts:      pointer.Of(3),
+				Backoff:       pointer.Of(1 * time.Second),
+				BackoffHCL:    "1s",
+				MaxBackoff:    pointer.Of(10 * time.Second),
+				MaxBackoffHCL: "10s",
+			},
+		},
 	},
 	Server: &ServerConfig{
 		Enabled:                   true,
@@ -1145,4 +1179,94 @@ func TestConfig_Telemetry(t *testing.T) {
 	mergedTelemetry2 := mergedTelemetry1.Merge(inputTelemetry2)
 	must.Eq(t, mergedTelemetry2.inMemoryCollectionInterval, 1*time.Second)
 	must.Eq(t, mergedTelemetry2.inMemoryRetentionPeriod, 10*time.Second)
+}
+
+func TestBasicConfigTemplateConfig(t *testing.T) {
+	ci.Parallel(t)
+
+	expected := &client.ClientTemplateConfig{
+		FunctionDenylist:      []string{"plugin", "writeToFile"},
+		DisableSandbox:        false,
+		MaxStaleHCL:           "87600h",
+		BlockQueryWaitTimeHCL: "5m",
+		Wait: &client.WaitConfig{
+			MinHCL: "5m",
+			MaxHCL: "10m",
+		},
+		WaitBounds: &client.WaitConfig{
+			MinHCL: "5m",
+			MaxHCL: "10m",
+		},
+		ConsulRetry: &client.RetryConfig{
+			Attempts:      pointer.Of(3),
+			BackoffHCL:    "1s",
+			MaxBackoffHCL: "10s",
+		},
+		VaultRetry: &client.RetryConfig{
+			Attempts:      pointer.Of(3),
+			Backoff:       pointer.Of(1 * time.Second),
+			BackoffHCL:    "1s",
+			MaxBackoff:    pointer.Of(10 * time.Second),
+			MaxBackoffHCL: "10s",
+		},
+		NomadRetry: &client.RetryConfig{
+			Attempts:      pointer.Of(3),
+			Backoff:       pointer.Of(1 * time.Second),
+			BackoffHCL:    "1s",
+			MaxBackoff:    pointer.Of(10 * time.Second),
+			MaxBackoffHCL: "10s",
+		},
+	}
+
+	must.Eq(t, expected, basicConfig.Client.TemplateConfig)
+}
+
+func TestBasicConfigTemplateConfigFields(t *testing.T) {
+	ci.Parallel(t)
+
+	tc := basicConfig.Client.TemplateConfig
+
+	// Test FunctionDenylist
+	must.Eq(t, []string{"plugin", "writeToFile"}, tc.FunctionDenylist)
+
+	// Test DisableSandbox
+	must.False(t, tc.DisableSandbox)
+
+	// Test MaxStaleHCL
+	must.Eq(t, "87600h", tc.MaxStaleHCL)
+
+	// Test BlockQueryWaitTimeHCL
+	must.Eq(t, "5m", tc.BlockQueryWaitTimeHCL)
+
+	// Test Wait config
+	must.NotNil(t, tc.Wait)
+	must.Eq(t, "5m", tc.Wait.MinHCL)
+	must.Eq(t, "10m", tc.Wait.MaxHCL)
+
+	// Test WaitBounds config
+	must.NotNil(t, tc.WaitBounds)
+	must.Eq(t, "5m", tc.WaitBounds.MinHCL)
+	must.Eq(t, "10m", tc.WaitBounds.MaxHCL)
+
+	// Test ConsulRetry config
+	must.NotNil(t, tc.ConsulRetry)
+	must.Eq(t, 3, *tc.ConsulRetry.Attempts)
+	must.Eq(t, "1s", tc.ConsulRetry.BackoffHCL)
+	must.Eq(t, "10s", tc.ConsulRetry.MaxBackoffHCL)
+
+	// Test VaultRetry config
+	must.NotNil(t, tc.VaultRetry)
+	must.Eq(t, 3, *tc.VaultRetry.Attempts)
+	must.Eq(t, 1*time.Second, *tc.VaultRetry.Backoff)
+	must.Eq(t, "1s", tc.VaultRetry.BackoffHCL)
+	must.Eq(t, 10*time.Second, *tc.VaultRetry.MaxBackoff)
+	must.Eq(t, "10s", tc.VaultRetry.MaxBackoffHCL)
+
+	// Test NomadRetry config
+	must.NotNil(t, tc.NomadRetry)
+	must.Eq(t, 3, *tc.NomadRetry.Attempts)
+	must.Eq(t, 1*time.Second, *tc.NomadRetry.Backoff)
+	must.Eq(t, "1s", tc.NomadRetry.BackoffHCL)
+	must.Eq(t, 10*time.Second, *tc.NomadRetry.MaxBackoff)
+	must.Eq(t, "10s", tc.NomadRetry.MaxBackoffHCL)
 }
